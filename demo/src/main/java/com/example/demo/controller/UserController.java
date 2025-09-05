@@ -4,8 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 class User {
     private Long id;
@@ -21,19 +21,34 @@ class User {
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final List<User> users = List.of(
-            new User(1L, "Alice"),
-            new User(2L, "Bob"),
-            new User(3L, "Charlie")
-    );
+    private final List<User> users = new ArrayList<>(List.of(
+        new User(1L, "Alice"),
+        new User(2L, "Bob"),
+        new User(3L, "Charlie")
+    ));
+    private final AtomicLong seq = new AtomicLong(3);
+
+    @GetMapping
+    public List<User> getAllUsers() { return users; }
 
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
-        Optional<User> user = users.stream()
-                .filter(u -> u.getId().equals(id))
-                .findFirst();
+        return users.stream().filter(u -> u.getId().equals(id))
+            .findFirst().map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
 
-        return user.map(ResponseEntity::ok)
-                   .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    @PostMapping
+    public User create(@RequestBody User u) {
+        long id = seq.incrementAndGet();
+        users.add(new User(id, u.getName()));
+        return users.get(users.size() - 1);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        boolean removed = users.removeIf(u -> u.getId().equals(id));
+        return removed ? ResponseEntity.noContent().build()
+                       : ResponseEntity.notFound().build();
     }
 }
